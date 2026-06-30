@@ -35,6 +35,15 @@ function Wait-ForLocalPort {
     }
 }
 
+function Test-InferenceServer {
+    try {
+        $response = Invoke-WebRequest -Uri "http://127.0.0.1:9001/docs" -UseBasicParsing -TimeoutSec 3
+        return $response.Content -like "*Roboflow Inference Server*"
+    } catch {
+        return $false
+    }
+}
+
 function Get-DotEnvValue {
     param([Parameter(Mandatory = $true)][string]$Name)
 
@@ -145,12 +154,24 @@ try {
         exit 1
     }
 
-    if (-not (Test-LocalPort -Port 9001)) {
+    if ((Test-LocalPort -Port 9001) -and -not (Test-InferenceServer)) {
+        Write-Host "Port 9001 is open, but it does not look like Roboflow Inference Server." -ForegroundColor Yellow
+        Write-Host "Close the app using port 9001, then run start-local.cmd again."
+        exit 1
+    }
+
+    if (-not (Test-InferenceServer)) {
         Write-Host "Starting Roboflow Inference Server on http://127.0.0.1:9001 ..."
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "install-inference-server.ps1")
     }
 
     Wait-ForLocalPort -Port 9001 -TimeoutSeconds 60
+    if (-not (Test-InferenceServer)) {
+        Write-Host "Roboflow Inference Server is not healthy." -ForegroundColor Yellow
+        Write-Host "If you saw a Pydantic BaseModel/schema error, run:"
+        Write-Host "powershell -ExecutionPolicy Bypass -File .\install-inference-server.ps1 -ForceReinstall -Version 1.3.2"
+        exit 1
+    }
 
     Write-Host ""
     Write-Host "Roboflow Inference Server: http://127.0.0.1:9001"

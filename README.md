@@ -61,6 +61,18 @@ Windows 也可以直接執行 `start-dashboard.cmd`。它會自動尋找本機 N
 
 如果還是不行，請不要只截瀏覽器畫面；請複製 `start-local.cmd` 視窗裡最後幾行錯誤訊息。最常見原因是 Node.js 未安裝、Node.js 版本低於 20、`PORT=3000` 已被其他程式佔用，或 Roboflow Inference Server 第一次下載模型尚未完成。
 
+如果 Roboflow Inference Server 出現 Pydantic 錯誤，例如 `Field name "schema" ... shadows an attribute in parent "BaseModel"`，請在另一台電腦的專案資料夾執行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-inference-server.ps1 -ForceReinstall -Version 1.3.2
+```
+
+完成後再執行：
+
+```powershell
+.\start-local.cmd
+```
+
 ## 使用方式
 
 - **相機偵測**：按「啟動相機」並允許瀏覽器使用鏡頭後，系統會自動持續偵測。相機影像會持續播放，偵測框以透明圖層疊在即時畫面上。

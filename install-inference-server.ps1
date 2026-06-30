@@ -1,6 +1,11 @@
+param(
+    [string]$Version = "1.3.2",
+    [switch]$ForceReinstall
+)
+
 $ErrorActionPreference = "Stop"
 
-$version = "1.3.3"
+$version = $Version.Trim().TrimStart("v")
 $installerName = "inference-$version-cpu-installer.exe"
 $downloadUrl = "https://github.com/roboflow/inference/releases/download/v$version/$installerName"
 $downloadDir = Join-Path $env:TEMP "aquapulse-roboflow-inference"
@@ -31,6 +36,26 @@ function Test-LocalPort {
     } finally {
         $client.Close()
     }
+}
+
+function Test-InferenceServer {
+    try {
+        $response = Invoke-WebRequest -Uri "http://127.0.0.1:9001/docs" -UseBasicParsing -TimeoutSec 3
+        return $response.Content -like "*Roboflow Inference Server*"
+    } catch {
+        return $false
+    }
+}
+
+function Stop-InferenceServer {
+    $processes = Get-Process -Name "inference" -ErrorAction SilentlyContinue
+    if (-not $processes) {
+        return
+    }
+
+    Write-Host "Stopping existing Roboflow Inference Server..."
+    $processes | Stop-Process -Force
+    Start-Sleep -Seconds 2
 }
 
 function Show-InstallLogTail {
@@ -95,12 +120,20 @@ $($_.Exception.Message)
 
 New-Item -ItemType Directory -Force -Path $downloadDir | Out-Null
 
-if (Test-LocalPort -Port 9001) {
+if ((Test-LocalPort -Port 9001) -and (Test-InferenceServer) -and -not $ForceReinstall) {
     Write-Host "Roboflow Inference Server is already running on http://127.0.0.1:9001"
     exit 0
 }
 
-if (-not (Test-Path $installPath)) {
+if ((Test-LocalPort -Port 9001) -and -not (Test-InferenceServer)) {
+    throw "Port 9001 is already in use, but it does not look like Roboflow Inference Server. Close the app using port 9001 and run this script again."
+}
+
+if ($ForceReinstall) {
+    Stop-InferenceServer
+}
+
+if ((-not (Test-Path $installPath)) -or $ForceReinstall) {
     if (Test-Path $installerPath) {
         $existingInstaller = Get-Item -LiteralPath $installerPath
         if ($existingInstaller.Length -lt $minimumInstallerBytes) {
@@ -139,7 +172,7 @@ Installer log:
 $logPath
 
 Try running this PowerShell window as Administrator, then run:
-powershell -ExecutionPolicy Bypass -File .\install-inference-server.ps1
+powershell -ExecutionPolicy Bypass -File .\install-inference-server.ps1 -ForceReinstall -Version 1.3.2
 "@
     }
 
@@ -151,10 +184,18 @@ powershell -ExecutionPolicy Bypass -File .\install-inference-server.ps1
 
 Write-Host "Starting Roboflow Inference Server on http://127.0.0.1:9001 ..."
 Start-Process -FilePath $installPath -WorkingDirectory (Split-Path $installPath) -WindowStyle Hidden
-Start-Sleep -Seconds 2
+Start-Sleep -Seconds 5
 
-if (-not (Test-LocalPort -Port 9001)) {
-    throw "Roboflow Inference was started, but http://127.0.0.1:9001 is not reachable yet. Wait 30 seconds and run this script again."
+if (-not (Test-InferenceServer)) {
+    throw @"
+Roboflow Inference was started, but http://127.0.0.1:9001/docs is not healthy yet.
+
+If you saw a Pydantic error such as:
+Field name 'schema' shadows an attribute in parent BaseModel
+
+run this fallback command:
+powershell -ExecutionPolicy Bypass -File .\install-inference-server.ps1 -ForceReinstall -Version 1.3.2
+"@
 }
 
-Write-Host "Done. Roboflow Inference Server is running on http://127.0.0.1:9001"
+Write-Host "Done. Roboflow Inference Server v$version is running on http://127.0.0.1:9001"
