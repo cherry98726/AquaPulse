@@ -49,6 +49,7 @@ const WARMUP_IMAGE_BASE64 = createSolidBmpBase64(64, 64);
 
 const modelWarmupPromises = new Map();
 const modelWarmupStatuses = new Map();
+const modelWarmupErrors = new Map();
 
 const mimeTypes = {
   ".css": "text/css; charset=utf-8",
@@ -75,6 +76,7 @@ const server = createServer(async (request, response) => {
         browserInferenceEnabled,
         inferenceTarget: selfHostedInference ? "self-hosted" : "hosted",
         publishableKey,
+        warmupError: getWarmupError(dashboard.modelId),
         warmupStatus: getWarmupStatus(dashboard.modelId),
       });
     }
@@ -208,10 +210,12 @@ async function handleDetection(request, response) {
 
 function warmRoboflowModel(modelId = defaultDashboard.modelId) {
   if ((!apiKey && !selfHostedInference) || !validateModelId(modelId)) {
+    const error =
+      "Roboflow API key、本機 Inference Server 或預設 Model ID 尚未設定。";
+    setWarmupError(modelId, error);
     return Promise.resolve({
       ready: false,
-      error:
-        "Roboflow API key、本機 Inference Server 或預設 Model ID 尚未設定。",
+      error,
     });
   }
 
@@ -252,18 +256,21 @@ function warmRoboflowModel(modelId = defaultDashboard.modelId) {
 
       if (!response.ok || !payload || typeof payload !== "object") {
         setWarmupStatus(modelId, "error");
+        const error = describeRoboflowError({
+          payload,
+          responseText,
+          status: response.status,
+          contentType,
+        });
+        setWarmupError(modelId, error);
         return {
           ready: false,
-          error: describeRoboflowError({
-            payload,
-            responseText,
-            status: response.status,
-            contentType,
-          }),
+          error,
         };
       }
 
       setWarmupStatus(modelId, "ready");
+      setWarmupError(modelId, "");
       return {
         ready: true,
         modelId,
@@ -272,10 +279,12 @@ function warmRoboflowModel(modelId = defaultDashboard.modelId) {
     } catch (error) {
       setWarmupStatus(modelId, "error");
       const cause = error.cause?.code || error.cause?.message;
+      const message = `模型預熱失敗：${cause || error.message || "未知錯誤"}`;
+      setWarmupError(modelId, message);
       return {
         ready: false,
         modelId,
-        error: `模型預熱失敗：${cause || error.message || "未知錯誤"}`,
+        error: message,
       };
     } finally {
       clearTimeout(timeout);
@@ -305,6 +314,18 @@ function getWarmupStatus(modelId) {
 
 function setWarmupStatus(modelId, status) {
   modelWarmupStatuses.set(modelId, status);
+}
+
+function getWarmupError(modelId) {
+  return modelWarmupErrors.get(modelId) || "";
+}
+
+function setWarmupError(modelId, error) {
+  if (error) {
+    modelWarmupErrors.set(modelId, error);
+  } else {
+    modelWarmupErrors.delete(modelId);
+  }
 }
 
 function createSolidBmpBase64(width, height) {

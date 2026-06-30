@@ -95,3 +95,19 @@ test("replaces upstream HTML error pages with a useful network message", () => {
   assert.match(message, /HTTP 403/);
   assert.doesNotMatch(message, /DOCTYPE/);
 });
+
+test("explains SAM3-only model errors from local inference", () => {
+  const message = describeRoboflowError({
+    payload: {
+      error:
+        "Your inference config does not support SAM3 model. Install SAM3 dependencies and set CORE_MODEL_SAM3_ENABLED to True.",
+    },
+    responseText: "",
+    status: 500,
+    contentType: "application/json",
+  });
+
+  assert.match(message, /需要 SAM3/);
+  assert.match(message, /Object Detection/);
+  assert.doesNotMatch(message, /Install SAM3 dependencies/);
+});

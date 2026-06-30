@@ -73,6 +73,13 @@ powershell -ExecutionPolicy Bypass -File .\install-inference-server.ps1 -ForceRe
 .\start-local.cmd
 ```
 
+如果偵測時出現 `CORE_MODEL_SAM3_ENABLED`、`SAM3 dependencies` 或類似 `does not support SAM3 model` 的錯誤，代表你目前選到的 Roboflow model/version 需要 SAM3。官方 Roboflow Inference 的 `sam3` extra 只適用於 GPU inference，不適合這個 Windows CPU no-VPN 啟動方式。
+
+這時請用其中一個方式處理：
+
+- 在 Roboflow 重新確認 model 是一般 **Object Detection** 專案與版本，然後把 `.env` 裡的 `DASHBOARD_MODELS` 改成那個 `project/version`。
+- 若一定要用 SAM3，改用有 NVIDIA/CUDA 的 GPU 電腦與 GPU inference，或改走 Roboflow hosted/serverless 端點。
+
 ## 使用方式
 
 - **相機偵測**：按「啟動相機」並允許瀏覽器使用鏡頭後，系統會自動持續偵測。相機影像會持續播放，偵測框以透明圖層疊在即時畫面上。

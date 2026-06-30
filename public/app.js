@@ -65,6 +65,7 @@ const state = {
   requestController: null,
   stream: null,
   viewMode: "empty",
+  warmupError: "",
   warmupStatus: "idle",
 };
 
@@ -97,6 +98,7 @@ async function initialize() {
     state.inferenceTarget = config.inferenceTarget || "hosted";
     state.publishableKey = config.publishableKey || "";
     state.localInferenceStatus = state.publishableKey ? "loading" : "disabled";
+    state.warmupError = config.warmupError || "";
     state.warmupStatus = config.warmupStatus || "idle";
     elements.modelId.value = config.defaultModelId || "";
     renderDashboardIdentity(config.dashboard);
@@ -184,7 +186,9 @@ function updateConnectionState() {
     : state.warmupStatus === "warming"
       ? `${inferenceTargetLabel()} 預熱中`
       : state.warmupStatus === "error"
-        ? `${inferenceTargetLabel()} 連線或預熱失敗`
+        ? warmupErrorLooksLikeConnectionIssue()
+          ? `${inferenceTargetLabel()} 連線失敗`
+          : `${inferenceTargetLabel()} 模型預熱失敗`
         : `${inferenceTargetLabel()} 已就緒`;
   elements.setupNote.classList.toggle(
     "configured",
@@ -202,7 +206,14 @@ function updateConnectionState() {
     ? state.warmupStatus === "warming"
       ? `<strong>${inferenceTargetLabel()} 預熱中</strong><span>預熱完成後，第一幀也能更快回應。</span>`
       : state.warmupStatus === "error"
-        ? `<strong>${inferenceTargetLabel()} 未就緒</strong><span>若要不開 VPN，請確認本機 Inference Server 已在 <code>127.0.0.1:9001</code> 啟動。</span>`
+        ? `<strong>${
+            warmupErrorLooksLikeConnectionIssue()
+              ? `${inferenceTargetLabel()} 連線失敗`
+              : `${inferenceTargetLabel()} 已連線，但模型預熱失敗`
+          }</strong><span>${escapeHtml(
+            state.warmupError ||
+              "請確認 Model ID 是 Roboflow 的一般 Object Detection model/version，且模型已在本機 Inference Server 快取。",
+          )}</span>`
         : `<strong>${inferenceTargetLabel()} 模式</strong><span>啟動相機即可開始正式推論；影像會送到 ${
             state.inferenceTarget === "self-hosted" ? "本機服務" : "Roboflow 雲端"
           }。</span>`
@@ -222,16 +233,26 @@ function inferenceTargetLabel() {
     : "Roboflow 模型";
 }
 
+function warmupErrorLooksLikeConnectionIssue() {
+  return /無法連線|fetch failed|ECONNREFUSED|127\.0\.0\.1:9001|localhost:9001/i.test(
+    state.warmupError || "",
+  );
+}
+
 async function warmUpModel() {
   state.warmupStatus = "warming";
+  state.warmupError = "";
   updateConnectionState();
 
   try {
     const response = await fetch(apiUrl("/api/warmup"), { method: "POST" });
     const result = await response.json();
     state.warmupStatus = result.ready ? "ready" : "error";
+    state.warmupError = result.ready ? "" : result.error || "";
   } catch {
     state.warmupStatus = "error";
+    state.warmupError =
+      "Dashboard 後端無法連到本機 Roboflow Inference Server。請確認 127.0.0.1:9001 已啟動。";
   }
   updateConnectionState();
 }

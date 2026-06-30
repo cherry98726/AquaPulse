@@ -59,6 +59,7 @@ const state = {
   requestController: null,
   stream: null,
   viewMode: "empty",
+  warmupError: "",
   warmupStatus: "idle",
 };
 
@@ -167,7 +168,9 @@ function updateConnectionState() {
     : state.warmupStatus === "warming"
       ? `${inferenceTargetLabel()} 預熱中`
       : state.warmupStatus === "error"
-        ? `${inferenceTargetLabel()} 連線或預熱失敗`
+        ? warmupErrorLooksLikeConnectionIssue()
+          ? `${inferenceTargetLabel()} 連線失敗`
+          : `${inferenceTargetLabel()} 模型預熱失敗`
         : `${inferenceTargetLabel()} 已就緒`;
   elements.setupNote.classList.toggle(
     "configured",
@@ -185,7 +188,14 @@ function updateConnectionState() {
     ? state.warmupStatus === "warming"
       ? `<strong>${inferenceTargetLabel()} 預熱中</strong><span>預熱完成後，第一幀也能更快回應。</span>`
       : state.warmupStatus === "error"
-        ? `<strong>${inferenceTargetLabel()} 未就緒</strong><span>若要不開 VPN，請確認本機 Inference Server 已在 <code>127.0.0.1:9001</code> 啟動。</span>`
+        ? `<strong>${
+            warmupErrorLooksLikeConnectionIssue()
+              ? `${inferenceTargetLabel()} 連線失敗`
+              : `${inferenceTargetLabel()} 已連線，但模型預熱失敗`
+          }</strong><span>${escapeHtml(
+            state.warmupError ||
+              "請確認 Model ID 是 Roboflow 的一般 Object Detection model/version，且模型已在本機 Inference Server 快取。",
+          )}</span>`
         : `<strong>${inferenceTargetLabel()} 模式</strong><span>啟動相機即可開始正式推論；影像會送到 ${
             state.inferenceTarget === "self-hosted" ? "本機服務" : "Roboflow 雲端"
           }。</span>`
@@ -205,8 +215,15 @@ function inferenceTargetLabel() {
     : "Roboflow 模型";
 }
 
+function warmupErrorLooksLikeConnectionIssue() {
+  return /無法連線|Failed to fetch|fetch failed|ECONNREFUSED|127\.0\.0\.1:9001|localhost:9001/i.test(
+    state.warmupError || "",
+  );
+}
+
 async function warmUpModel() {
   state.warmupStatus = "warming";
+  state.warmupError = "";
   updateConnectionState();
 
   try {
@@ -214,8 +231,12 @@ async function warmUpModel() {
       confidence: 0.99,
     });
     state.warmupStatus = "ready";
-  } catch {
+  } catch (error) {
     state.warmupStatus = "error";
+    state.warmupError =
+      error instanceof TypeError
+        ? "無法連線到本機 Roboflow Inference Server。請確認這台電腦已啟動 http://127.0.0.1:9001。"
+        : error.message || "";
   }
   updateConnectionState();
 }
@@ -433,8 +454,7 @@ async function inferWithLocalServer(modelId, image, { confidence = 0.4, signal }
 
   if (!response.ok) {
     throw new Error(
-      payload?.message ||
-        payload?.error ||
+      formatKnownInferenceError(payload?.message || payload?.error) ||
         "本機 Inference Server 推論失敗，請確認模型已快取。",
     );
   }
@@ -706,6 +726,22 @@ function stripDataUrl(image) {
   return image.startsWith("data:") && commaIndex !== -1
     ? image.slice(commaIndex + 1)
     : image;
+}
+
+function formatKnownInferenceError(message) {
+  if (!message) {
+    return "";
+  }
+
+  if (
+    /CORE_MODEL_SAM3_ENABLED|SAM3 dependencies|SMA3 dependencies|does not support SAM3|does not support SMA3/i.test(
+      message,
+    )
+  ) {
+    return "這個 Roboflow 模型需要 SAM3，但目前的本機 Roboflow Inference Server 不支援 SAM3。Windows/CPU installer 通常只能跑一般 object detection；請改用 Roboflow 上的 Object Detection model/version，或使用支援 SAM3 的 GPU inference/Roboflow hosted 端點。";
+  }
+
+  return String(message).trim();
 }
 
 function scheduleNextDetection() {
