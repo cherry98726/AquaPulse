@@ -41,5 +41,5 @@ if (-not (Test-Path $installPath)) {
 }
 
 Write-Host "Starting Roboflow Inference Server on http://127.0.0.1:9001 ..."
-Start-Process -FilePath $installPath -WorkingDirectory (Split-Path $installPath)
+Start-Process -FilePath $installPath -WorkingDirectory (Split-Path $installPath) -WindowStyle Hidden
 Write-Host "Done. Keep the Roboflow Inference Server running while using the GitHub Pages dashboard."

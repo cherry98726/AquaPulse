@@ -44,6 +44,23 @@ Windows 也可以直接執行 `start-dashboard.cmd`。它會自動尋找本機 N
 
 專案沒有外部 npm dependencies，因此不需要先執行 `npm install`。
 
+### Clone 到另一台電腦
+
+如果是在另一台電腦 clone GitHub repo，請先把 `.env.example` 複製成 `.env` 並填好設定，然後直接執行：
+
+```powershell
+.\start-local.cmd
+```
+
+這個腳本會先確認 `http://127.0.0.1:9001` 的 Roboflow Inference Server 已啟動，再啟動 `http://127.0.0.1:3000` 的 dashboard。
+
+如果瀏覽器顯示 `can't reach this page`，通常代表 `3000` 的 dashboard 還沒有啟動，或啟動視窗已經被關掉。請保持 `start-local.cmd` 開出的終端機視窗開著，再開：
+
+- [http://127.0.0.1:3000/dashboards/lego](http://127.0.0.1:3000/dashboards/lego)
+- [http://127.0.0.1:3000/dashboards/people](http://127.0.0.1:3000/dashboards/people)
+
+如果還是不行，請不要只截瀏覽器畫面；請複製 `start-local.cmd` 視窗裡最後幾行錯誤訊息。最常見原因是 Node.js 未安裝、Node.js 版本低於 20、`PORT=3000` 已被其他程式佔用，或 Roboflow Inference Server 第一次下載模型尚未完成。
+
 ## 使用方式
 
 - **相機偵測**：按「啟動相機」並允許瀏覽器使用鏡頭後，系統會自動持續偵測。相機影像會持續播放，偵測框以透明圖層疊在即時畫面上。
