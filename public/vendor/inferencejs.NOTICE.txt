@@ -1,0 +1,4 @@
+inferencejs 1.2.3
+Copyright Roboflow, Inc.
+Distributed under the ISC license.
+https://www.npmjs.com/package/inferencejs

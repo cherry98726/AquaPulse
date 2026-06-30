@@ -1,0 +1,7 @@
+.env
+node_modules/
+.agents/
+.codex/
+.DS_Store
+Thumbs.db
+npm-debug.log*

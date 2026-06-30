@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="AquaPulse Roboflow 即時物件偵測儀表板"
+    />
+    <title>AquaPulse Vision Dashboard</title>
+    <link rel="stylesheet" href="../../styles.css?v=1" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="AquaPulse 首頁">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 40 40">
+              <path d="M20 4C14 12 8 18 8 25a12 12 0 0 0 24 0C32 18 26 12 20 4Z" />
+              <path class="brand-wave" d="M12 26c5-4 11 4 16 0" />
+            </svg>
+          </span>
+          <span>
+            <strong>AQUAPULSE</strong>
+            <small>VISION CONSOLE</small>
+          </span>
+        </a>
+
+        <div class="topbar-status">
+          <span class="connection-dot" id="connectionDot"></span>
+          <span id="connectionLabel">檢查 Roboflow 設定中</span>
+        </div>
+      </header>
+
+      <main class="dashboard">
+        <section class="hero">
+          <div>
+            <p class="eyebrow">OBJECT DETECTION</p>
+            <h1 id="heroTitle">即時物件偵測儀表板</h1>
+            <p id="heroDescription">
+              啟動相機後，使用你的 Roboflow 模型即時辨識、標記並統計畫面中的物件。
+            </p>
+          </div>
+          <div class="hero-meta">
+            <span>LIVE INFERENCE</span>
+            <strong id="clock">--:--:--</strong>
+          </div>
+        </section>
+
+        <section class="stats-grid" aria-label="偵測摘要">
+          <article class="stat-card primary-stat">
+            <div class="stat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" />
+                <rect x="8" y="8" width="8" height="8" rx="2" />
+              </svg>
+            </div>
+            <div>
+              <span>偵測物件</span>
+              <strong id="totalCount">0</strong>
+            </div>
+            <small id="countDelta">等待相機</small>
+          </article>
+
+          <article class="stat-card">
+            <span>物件類別</span>
+            <strong id="classCount">0</strong>
+            <small>不重複標籤</small>
+          </article>
+
+          <article class="stat-card">
+            <span>平均信心</span>
+            <strong id="averageConfidence">0%</strong>
+            <small id="confidenceHint">門檻 40%</small>
+          </article>
+
+          <article class="stat-card">
+            <span>推論時間</span>
+            <strong id="inferenceTime">--</strong>
+            <small id="inferenceHint">包含網路傳輸</small>
+          </article>
+        </section>
+
+        <section class="workspace-grid">
+          <aside class="control-panel panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">CONTROL PANEL</p>
+                <h2>偵測設定</h2>
+              </div>
+              <button
+                class="icon-button"
+                id="resetButton"
+                type="button"
+                title="重設畫面"
+                aria-label="重設畫面"
+              >
+                <svg viewBox="0 0 24 24">
+                  <path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.6M4 4v4.6h4.6" />
+                </svg>
+              </button>
+            </div>
+
+            <div class="field">
+              <label for="modelId">Roboflow Model ID</label>
+              <input
+                id="modelId"
+                name="modelId"
+                type="text"
+                placeholder="your-project/1"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <small>格式：project/version</small>
+            </div>
+
+            <nav class="model-presets" id="modelPresets" aria-label="Dashboard models" hidden></nav>
+
+            <div class="field">
+              <div class="field-row">
+                <label for="confidence">信心門檻</label>
+                <output id="confidenceValue" for="confidence">40%</output>
+              </div>
+              <input
+                id="confidence"
+                type="range"
+                min="10"
+                max="95"
+                step="5"
+                value="40"
+              />
+              <div class="range-scale">
+                <span>較多結果</span>
+                <span>較精準</span>
+              </div>
+            </div>
+
+            <div class="camera-card">
+              <div class="camera-card-heading">
+                <span class="camera-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M4 8h4l2-3h4l2 3h4v11H4V8Z" />
+                    <circle cx="12" cy="13" r="3.5" />
+                  </svg>
+                </span>
+                <span>
+                  <strong>即時相機</strong>
+                  <small>啟動後自動持續偵測，停止相機即停止</small>
+                </span>
+              </div>
+
+              <button class="secondary-button full-width" id="cameraButton" type="button">
+                啟動相機
+              </button>
+            </div>
+
+            <div class="control-actions">
+              <button class="text-button" id="demoButton" type="button">
+                載入介面示範
+              </button>
+            </div>
+
+            <div class="setup-note" id="setupNote">
+              <strong>尚未連接 Roboflow</strong>
+              <span>請在 <code>.env</code> 填入 API key 與模型 ID。</span>
+            </div>
+          </aside>
+
+          <section class="viewer-panel panel">
+            <div class="panel-heading viewer-heading">
+              <div>
+                <p class="eyebrow">LIVE VIEW</p>
+                <h2 id="viewerTitle">等待啟動相機</h2>
+              </div>
+              <div class="viewer-tools">
+                <span class="status-pill" id="runStatus">
+                  <span></span>
+                  READY
+                </span>
+                <button
+                  class="icon-button"
+                  id="downloadButton"
+                  type="button"
+                  title="下載目前標註畫面"
+                  aria-label="下載目前標註畫面"
+                  disabled
+                >
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="viewer-stage" id="viewerStage">
+              <div class="empty-state" id="emptyState">
+                <div class="scanner-graphic" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <i></i>
+                </div>
+                <h3>準備開始辨識</h3>
+                <p>點擊「啟動相機」，允許權限後便會開始偵測。</p>
+              </div>
+
+              <div class="camera-feed" id="cameraFeed">
+                <video id="cameraVideo" playsinline muted></video>
+                <canvas id="detectionCanvas"></canvas>
+              </div>
+
+              <div class="object-badge" id="objectBadge" hidden>
+                <strong id="badgeCount">0</strong>
+                <span>objects detected</span>
+              </div>
+
+              <div class="analysis-indicator" id="analysisIndicator" hidden>
+                <span class="loader"></span>
+                <span id="analysisLabel">AI 分析中</span>
+              </div>
+            </div>
+          </section>
+
+          <aside class="insights-panel panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">INSIGHTS</p>
+                <h2>類別分布</h2>
+              </div>
+              <span class="mini-count" id="insightCount">0 items</span>
+            </div>
+
+            <div class="class-list" id="classList">
+              <div class="insights-empty">
+                <span class="empty-bars" aria-hidden="true">
+                  <i></i><i></i><i></i>
+                </span>
+                <p>完成偵測後，類別統計會顯示在這裡。</p>
+              </div>
+            </div>
+
+            <div class="detections-section">
+              <div class="subheading">
+                <h3>偵測明細</h3>
+                <span id="tableCount">0</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>類別</th>
+                      <th>信心</th>
+                    </tr>
+                  </thead>
+                  <tbody id="detectionTable">
+                    <tr class="table-empty">
+                      <td colspan="2">尚無資料</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        <footer>
+          <span>AquaPulse Vision Dashboard</span>
+          <span>Powered by Roboflow Inference</span>
+        </footer>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="../../app.js?v=1"></script>
+  </body>
+</html>
