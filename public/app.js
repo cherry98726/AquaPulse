@@ -286,14 +286,7 @@ async function toggleCamera() {
   }
 
   try {
-    state.stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: "environment",
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-      },
-      audio: false,
-    });
+    state.stream = await openCameraStream();
     elements.cameraVideo.srcObject = state.stream;
     await waitForVideo(elements.cameraVideo);
     await elements.cameraVideo.play();
@@ -314,11 +307,83 @@ async function toggleCamera() {
     scheduleNextDetection();
   } catch (error) {
     stopCamera();
-    const message =
-      error.name === "NotAllowedError"
-        ? "相機權限被拒絕，請在瀏覽器網址列允許相機。"
-        : "無法開啟相機，請確認沒有其他程式正在使用鏡頭。";
-    showToast(message, true);
+    console.error("Camera error", error);
+    showToast(await cameraErrorMessage(error), true);
+  }
+}
+
+async function openCameraStream() {
+  const preferredConstraints = {
+    video: {
+      facingMode: { ideal: "environment" },
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+    },
+    audio: false,
+  };
+
+  try {
+    return await navigator.mediaDevices.getUserMedia(preferredConstraints);
+  } catch (error) {
+    if (!shouldRetryCameraWithoutConstraints(error)) {
+      throw error;
+    }
+
+    return navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: false,
+    });
+  }
+}
+
+function shouldRetryCameraWithoutConstraints(error) {
+  return [
+    "OverconstrainedError",
+    "ConstraintNotSatisfiedError",
+    "NotFoundError",
+    "DevicesNotFoundError",
+  ].includes(error?.name);
+}
+
+async function cameraErrorMessage(error) {
+  const name = error?.name || error?.message || "UnknownError";
+  const deviceCount = await countVideoInputs();
+  const deviceHint =
+    deviceCount == null ? "" : ` 瀏覽器目前偵測到 ${deviceCount} 個鏡頭。`;
+
+  if (["NotAllowedError", "PermissionDeniedError", "SecurityError"].includes(name)) {
+    return `相機權限被拒絕。請在瀏覽器網址列允許相機，並確認 Windows「設定 > 隱私權與安全性 > 相機」已開啟瀏覽器權限。(${name})`;
+  }
+
+  if (["NotFoundError", "DevicesNotFoundError"].includes(name)) {
+    return `找不到可用鏡頭。請確認這台電腦有相機、外接相機已插好，或在 Windows 相機隱私權中允許瀏覽器使用。${deviceHint} (${name})`;
+  }
+
+  if (["NotReadableError", "TrackStartError"].includes(name)) {
+    return `相機存在但無法讀取，常見原因是被 Teams、Zoom、相機 App 或瀏覽器另一個分頁佔用。請關閉那些程式後重新整理。${deviceHint} (${name})`;
+  }
+
+  if (["OverconstrainedError", "ConstraintNotSatisfiedError"].includes(name)) {
+    return `相機不支援這個解析度或鏡頭方向，已嘗試改用預設相機仍失敗。請換另一個瀏覽器或檢查相機驅動。${deviceHint} (${name})`;
+  }
+
+  if (error?.message === "camera-timeout") {
+    return `相機已被瀏覽器接受，但一直沒有畫面。請關閉其他使用相機的程式，或在 Windows 相機 App 先確認鏡頭可正常顯示。${deviceHint}`;
+  }
+
+  if (error?.message === "camera-error") {
+    return `相機串流發生錯誤。請重新整理頁面，或確認瀏覽器和 Windows 都允許相機。${deviceHint}`;
+  }
+
+  return `無法開啟相機：${error?.message || name}。${deviceHint}`;
+}
+
+async function countVideoInputs() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter((device) => device.kind === "videoinput").length;
+  } catch {
+    return null;
   }
 }
 

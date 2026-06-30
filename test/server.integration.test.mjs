@@ -199,7 +199,7 @@ test("serves named dashboards with different default models", async (t) => {
   );
   const pageHtml = await pageResponse.text();
   assert.equal(pageResponse.status, 200);
-  assert.match(pageHtml, /app\.js\?v=11/);
+  assert.match(pageHtml, /app\.js\?v=12/);
 });
 
 test("supports self-hosted inference without exposing a publishable key", async (t) => {
